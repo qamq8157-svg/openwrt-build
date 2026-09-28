@@ -8,9 +8,6 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - name: Checkout OpenWrt
-        uses: actions/checkout@v4
-
       - name: Clone OpenWrt
         run: |
           git clone --depth 1 --branch v24.10.8 https://github.com/openwrt/openwrt.git openwrt
@@ -21,9 +18,19 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: Configure
+      - name: Configure x86_64
         working-directory: openwrt
         run: |
+          cat > .config <<'EOF'
+          CONFIG_TARGET_x86=y
+          CONFIG_TARGET_x86_64=y
+          CONFIG_TARGET_x86_64_DEVICE_generic=y
+          CONFIG_GRUB_IMAGES=y
+          CONFIG_GRUB_EFI_IMAGES=y
+          CONFIG_TARGET_ROOTFS_EXT4FS=y
+          CONFIG_TARGET_ROOTFS_SQUASHFS=y
+          EOF
+
           make defconfig
 
       - name: Download packages
@@ -34,10 +41,16 @@ jobs:
       - name: Build firmware
         working-directory: openwrt
         run: |
-          make -j$(nproc) || make -j1 V=s
+          make -j$(nproc)
+
+      - name: Show firmware files
+        working-directory: openwrt
+        run: |
+          echo "===== Firmware files ====="
+          find bin/targets/x86/64/ -maxdepth 1 -type f -printf '%f\n'
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-x86_64
-          path: openwrt/bin/targets/x86/64/
+          path: openwrt/bin/targets/x86/64/*
